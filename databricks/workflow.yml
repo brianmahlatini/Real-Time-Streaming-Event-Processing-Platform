@@ -1,0 +1,20 @@
+resources:
+  jobs:
+    real_time_transaction_stream:
+      name: real-time-transaction-stream
+      tasks:
+        - task_key: stream_transactions_to_delta
+          spark_python_task:
+            python_file: ./databricks/transaction_streaming_delta.py
+          existing_cluster_id: ${var.existing_cluster_id}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      tags:
+        project: real-time-streaming-event-processing-platform
+        workload: structured-streaming
+        owner: data-engineering
+
+variables:
+  existing_cluster_id:
+    description: Existing Databricks cluster id for portfolio deployment.

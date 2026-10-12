@@ -41,6 +41,19 @@ The platform is intentionally local-first. The same design can be lifted into Da
 - Data Fabric concepts for governance, cataloging, lineage, quality contracts, and cross-platform observability
 - pytest for unit-level validation of schema and business rules
 
+## Where Each Platform Is Used
+
+| Platform | Used in this project |
+| --- | --- |
+| Kafka | Durable event backbone for `transactions.v1` and invalid-event routing. |
+| Python | Synthetic operational event producer with duplicate, invalid, and late-arriving event scenarios. |
+| Spark Structured Streaming | Stateful validation, deduplication, watermarking, windowed aggregation, and sink writes. |
+| PostgreSQL | Local serving store for near-real-time analytics tables. |
+| Docker | Repeatable local infrastructure for Kafka, Spark, PostgreSQL, and producer execution. |
+| Databricks | Managed Spark and Delta Lake extension in `databricks/` for lakehouse deployment. |
+| Snowflake | Analytical warehouse extension in `snowflake/` using raw JSON, curated tables, streams, and tasks. |
+| Data Fabric | Governance layer in `data_fabric/` covering catalog metadata, lineage, ownership, and quality contracts. |
+
 ## Quick Start
 
 Prerequisites:
@@ -184,31 +197,50 @@ from processed_transactions;
 
 On Databricks, the Spark job can be moved to a Delta Live Tables or Structured Streaming job. Replace PostgreSQL serving tables with Delta tables, enable Unity Catalog governance, and use Auto Loader or Kafka source authentication for managed ingestion. Checkpoints should live in cloud object storage with lifecycle policies.
 
+Project artifact: `databricks/transaction_streaming_delta.py` implements the Delta Lake streaming path, and `databricks/workflow.yml` shows the Databricks Workflow job definition.
+
 ### Snowflake
 
 For Snowflake, Kafka events can land through Snowpipe Streaming or a Kafka connector into raw tables. Spark can still enrich and aggregate events, then write curated results to Snowflake. Use streams and tasks for downstream incremental models and define clustering on event time and account dimensions where query patterns justify it.
+
+Project artifact: `snowflake/schema.sql` defines raw and curated Snowflake tables, a stream, and an incremental task using `merge` semantics.
 
 ### Data Fabric
 
 The data fabric layer is the governance and interoperability plane across Kafka, Spark, PostgreSQL, Databricks, and Snowflake. In a production version, this would include a schema registry, data catalog, lineage, quality contracts, access policies, and common observability standards across batch and streaming assets.
 
+Project artifact: `data_fabric/catalog.yml` maps cross-platform lineage, and `data_fabric/quality_contracts.yml` defines freshness, uniqueness, required-field, and validation contracts.
+
 ## Repository Layout
+
+Current full layout:
 
 ```text
 .
-├── docker-compose.yml
-├── sql/
-│   └── init.sql
-├── src/
-│   ├── producer/
-│   │   └── generate_events.py
-│   └── streaming/
-│       ├── schemas.py
-│       └── spark_job.py
-├── tests/
-│   └── test_validation.py
-├── requirements.txt
-└── README.md
+|-- databricks/
+|   |-- README.md
+|   |-- transaction_streaming_delta.py
+|   `-- workflow.yml
+|-- data_fabric/
+|   |-- README.md
+|   |-- catalog.yml
+|   `-- quality_contracts.yml
+|-- docker-compose.yml
+|-- snowflake/
+|   |-- README.md
+|   `-- schema.sql
+|-- sql/
+|   `-- init.sql
+|-- src/
+|   |-- producer/
+|   |   `-- generate_events.py
+|   `-- streaming/
+|       |-- schemas.py
+|       `-- spark_job.py
+|-- tests/
+|   `-- test_validation.py
+|-- requirements.txt
+`-- README.md
 ```
 
 ## Run Tests

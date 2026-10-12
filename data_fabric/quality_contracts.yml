@@ -1,0 +1,28 @@
+contracts:
+  transactions_v1:
+    owner: data-engineering
+    freshness_slo_seconds: 120
+    uniqueness:
+      - event_id
+    required_fields:
+      - event_id
+      - event_time
+      - account_id
+      - merchant_id
+      - amount
+      - currency
+      - country
+      - status
+    rules:
+      - name: amount_must_be_positive
+        expression: amount > 0
+        severity: reject
+      - name: valid_status
+        expression: status in ('approved', 'declined', 'reversed')
+        severity: reject
+      - name: late_arrival_window
+        expression: event_time >= current_timestamp - interval '10 minutes'
+        severity: monitor
+      - name: event_id_must_be_unique
+        expression: event_id is unique within watermark
+        severity: deduplicate

@@ -1,0 +1,47 @@
+domain: operations
+project: real-time-streaming-event-processing-platform
+owner: data-engineering
+classification: internal
+
+platforms:
+  kafka:
+    role: event-backbone
+    assets:
+      - transactions.v1
+      - transactions.invalid.v1
+  spark:
+    role: streaming-compute
+    assets:
+      - transaction-validation
+      - transaction-window-aggregation
+  postgresql:
+    role: local-serving-store
+    assets:
+      - processed_transactions
+      - transaction_windows
+      - processing_errors
+  databricks:
+    role: managed-lakehouse-extension
+    assets:
+      - silver_transactions
+      - invalid_transactions
+      - gold_transaction_windows
+  snowflake:
+    role: analytical-warehouse-extension
+    assets:
+      - raw.transactions_json
+      - curated.processed_transactions
+      - curated.transaction_windows
+
+lineage:
+  - source: kafka.transactions.v1
+    transform: spark.transaction-validation
+    targets:
+      - postgresql.processed_transactions
+      - databricks.silver_transactions
+      - snowflake.curated.processed_transactions
+  - source: spark.transaction-window-aggregation
+    targets:
+      - postgresql.transaction_windows
+      - databricks.gold_transaction_windows
+      - snowflake.curated.transaction_windows

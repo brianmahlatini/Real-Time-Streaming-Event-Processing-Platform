@@ -1,0 +1,94 @@
+services:
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: streaming-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  kafka-init:
+    image: bitnami/kafka:3.7
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -c
+      - |
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic transactions.v1 --partitions 6 --replication-factor 1
+        kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic transactions.invalid.v1 --partitions 3 --replication-factor 1
+
+  postgres:
+    image: postgres:16
+    container_name: streaming-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: streaming
+      POSTGRES_PASSWORD: streaming
+      POSTGRES_DB: streaming_analytics
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streaming -d streaming_analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  spark-streaming:
+    image: bitnami/spark:3.5
+    container_name: streaming-spark
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./src:/app/src:ro
+      - spark-checkpoints:/tmp/spark-checkpoints
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/streaming_analytics
+      POSTGRES_USER: streaming
+      POSTGRES_PASSWORD: streaming
+      CHECKPOINT_LOCATION: /tmp/spark-checkpoints/transactions
+      TRIGGER_INTERVAL: 10 seconds
+    command:
+      - /bin/bash
+      - -c
+      - |
+        spark-submit \
+          --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.postgresql:postgresql:42.7.4 \
+          /app/src/streaming/spark_job.py
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer.Dockerfile
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: transactions.v1
+    profiles: ["tools"]
+
+volumes:
+  postgres-data:
+  spark-checkpoints:

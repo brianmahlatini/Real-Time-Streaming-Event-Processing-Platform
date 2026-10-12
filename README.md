@@ -36,6 +36,9 @@ The platform is intentionally local-first. The same design can be lifted into Da
 - Spark Structured Streaming for stateful processing
 - PostgreSQL for serving near-real-time analytics
 - Docker Compose for repeatable local infrastructure
+- Databricks as a managed Spark, Delta Lake, and Unity Catalog extension path
+- Snowflake as an analytical warehouse and Snowpipe Streaming extension path
+- Data Fabric concepts for governance, cataloging, lineage, quality contracts, and cross-platform observability
 - pytest for unit-level validation of schema and business rules
 
 ## Quick Start
